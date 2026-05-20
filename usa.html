@@ -64,6 +64,7 @@ body {
 /* BOTTOM TIMELINE */
 
 .timeline-container {
+
     position: absolute;
 
     bottom: 30px;
@@ -71,7 +72,6 @@ body {
 
     transform: translateX(-50%);
 
-    
     width: 60%;
     min-width: 320px;
     max-width: 900px;
@@ -85,6 +85,10 @@ body {
     border-radius: 12px;
 
     box-shadow: 0 0 15px rgba(0,0,0,0.2);
+}    
+
+.timeline-wrapper {
+    width: 100%;
 }
 
 #yearSlider {
@@ -92,17 +96,41 @@ body {
     cursor: pointer;
 }
 
-.timeline-labels {
+.timeline-ticks {
     display: flex;
     justify-content: space-between;
 
-    margin-top: 8px;
+    margin-top: 10px;
 
-    font-size: 12px;
+    font-size: 11px;
     color: #666;
 }
 
-</style></head>
+.timeline-ticks span {
+    position: relative;
+    text-align: center;
+}
+
+/* Tick mark line */
+
+.timeline-ticks span::before {
+
+    content: '';
+
+    position: absolute;
+
+    top: -10px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    width: 2px;
+    height: 8px;
+
+    background: #999;
+}
+</style>
+</head>
 
 <body>
 
@@ -132,18 +160,31 @@ body {
 
 <div class="timeline-container">
 
-    <input
-        type="range"
-        id="yearSlider"
-        min="0"
-        max="8"
-        step="1"
-        value="0"
-    />
+    <div class="timeline-wrapper">
 
-    <div class="timeline-labels">
-        <span>1783</span>
-        <span>1898</span>
+        <input
+            type="range"
+            id="yearSlider"
+            min="0"
+            max="8"
+            step="1"
+            value="0"
+        />
+
+        <div class="timeline-ticks">
+
+            <span>1783</span>
+            <span>1803</span>
+            <span>1819</span>
+            <span>1845</span>
+            <span>1846</span>
+            <span>1848</span>
+            <span>1853</span>
+            <span>1867</span>
+            <span>1898</span>
+
+        </div>
+
     </div>
 
 </div>
