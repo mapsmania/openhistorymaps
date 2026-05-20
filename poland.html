@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poland Border Shift: 1939 vs 1945</title>
+    <title>Poland Border Shift: Historical Context</title>
     <script src="https://unpkg.com/maplibre-gl@^4.0.0/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@^4.0.0/dist/maplibre-gl.css" rel="stylesheet" />
     <style>
@@ -18,6 +18,7 @@
             border-radius: 8px;
             box-shadow: 0 0 15px rgba(0,0,0,0.2);
             z-index: 1;
+            width: 280px; /* Widened to fit text better */
         }
         button {
             padding: 10px 15px;
@@ -26,6 +27,9 @@
             background: #f8f8f8;
             font-weight: bold;
             border-radius: 4px;
+            margin-bottom: 5px;
+            width: 100%; /* Make buttons stack nicely */
+            text-align: left;
         }
         button.active {
             background: #2c3e50;
@@ -33,14 +37,37 @@
             border-color: #2c3e50;
         }
         .legend { margin-bottom: 10px; font-size: 14px; }
+        
+        /* New Styles for Context Box */
+        #context {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #444;
+        }
+        .context-title {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+            color: #000;
+        }
     </style>
 </head>
 <body>
 
 <div class="controls">
-    <div class="legend"><strong>Toggle Border Era</strong></div>
-    <button id="btn1939" class="active" onclick="showEra('1939')">1939 Borders</button>
+    <div class="legend"><strong>Polish Borders</strong></div>
+    <button id="btn1815" class="active" onclick="showEra('1815')">1815 Borders</button>
+    <button id="btn1939" onclick="showEra('1939')">1939 Borders</button>
     <button id="btn1945" onclick="showEra('1945')">1945 Borders</button>
+    
+    <!-- New Context Div -->
+    <div id="context">
+        <span class="context-title" id="ctx-title">Congress Poland (1815)</span>
+        <span id="ctx-text">Created at the Congress of Vienna after the Napoleonic Wars. It was a semi-autonomous Kingdom in a personal union with the Russian Empire.</span>
+    </div>
 </div>
 
 <div id="map"></div>
@@ -48,60 +75,90 @@
 <script>
     const map = new maplibregl.Map({
         container: 'map',
-        style: 'https://demotiles.maplibre.org/style.json', // Basic grayscale style
-        center: [19.145, 52.068], // Center of Poland
+        style: 'https://tiles.openfreemap.org/styles/positron', 
+        center: [19.145, 52.068], 
         zoom: 5
     });
 
+    const eras = ['1815', '1939', '1945'];
+
+    // Historical Content Object
+    const info = {
+        '1815': {
+            title: 'Congress Poland (1815)',
+            text: 'Created at the Congress of Vienna after the Napoleonic Wars. It was a semi-autonomous Kingdom in a personal union with the Russian Empire.'
+        },
+        '1939': {
+            title: 'Second Polish Republic (1939)',
+            text: 'The borders of independent Poland before the Nazi-Soviet invasion. Note the "Polish Corridor" to the sea and the eastern territories (Kresy).'
+        },
+        '1945': {
+            title: 'Post-War Poland (1945)',
+            text: 'Following WWII, Polands borders were shifted west. It lost eastern lands to the USSR but gained former German territories in the west and north.'
+        }
+    };
+
     map.on('load', () => {
-        // 1. ADD 1939 SOURCE & LAYER
-        map.addSource('poland1939', {
+        // 1. ADD 1815
+        map.addSource('poland1815', {
             type: 'geojson',
-            data: 'poland1938.geojson' // REPLACE with your GeoJSON variable or path
+            data: 'https://mapsmania.github.io/openhistorymaps/poland1815.geojson' 
+        });
+        map.addLayer({
+            'id': 'layer1815',
+            'type': 'line',
+            'source': 'poland1815',
+            'layout': { 'visibility': 'visible' },
+            'paint': { 'line-color': '#27ae60', 'line-width': 3 }
         });
 
+        // 2. ADD 1939
+        map.addSource('poland1939', {
+            type: 'geojson',
+            data: 'https://mapsmania.github.io/openhistorymaps/poland1938.geojson'
+        });
         map.addLayer({
             'id': 'layer1939',
             'type': 'line',
             'source': 'poland1939',
-            'layout': { 'visibility': 'visible' },
-            'paint': {
-                'line-color': '#e74c3c', // Red
-                'line-width': 3
-            }
+            'layout': { 'visibility': 'none' },
+            'paint': { 'line-color': '#e74c3c', 'line-width': 3 }
         });
 
-        // 2. ADD 1945 SOURCE & LAYER
+        // 3. ADD 1945
         map.addSource('poland1945', {
             type: 'geojson',
-            data: 'poland1945.geojson' // REPLACE with your GeoJSON variable or path
+            data: 'https://mapsmania.github.io/openhistorymaps/poland1945.geojson'
         });
-
         map.addLayer({
             'id': 'layer1945',
             'type': 'line',
             'source': 'poland1945',
             'layout': { 'visibility': 'none' },
             'paint': {
-                'line-color': '#3498db', // Blue
+                'line-color': '#3498db',
                 'line-width': 3,
-                'line-dasharray': [2, 1] // Dashed to distinguish if overlapping
+                'line-dasharray': [2, 1]
             }
         });
     });
 
-    function showEra(era) {
-        if (era === '1939') {
-            map.setLayoutProperty('layer1939', 'visibility', 'visible');
-            map.setLayoutProperty('layer1945', 'visibility', 'none');
-            document.getElementById('btn1939').classList.add('active');
-            document.getElementById('btn1945').classList.remove('active');
-        } else {
-            map.setLayoutProperty('layer1939', 'visibility', 'none');
-            map.setLayoutProperty('layer1945', 'visibility', 'visible');
-            document.getElementById('btn1945').classList.add('active');
-            document.getElementById('btn1939').classList.remove('active');
-        }
+    function showEra(selectedEra) {
+        eras.forEach(era => {
+            const visibility = (era === selectedEra) ? 'visible' : 'none';
+            map.setLayoutProperty(`layer${era}`, 'visibility', visibility);
+            
+            const btn = document.getElementById(`btn${era}`);
+            if (era === selectedEra) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        // Update the Context Text
+        document.getElementById('ctx-title').innerText = info[selectedEra].title;
+        document.getElementById('ctx-text').innerText = info[selectedEra].text;
     }
 </script>
 
