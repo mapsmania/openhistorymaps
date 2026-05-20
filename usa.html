@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<title>US Territorial Expansion</title>
+
+<script src="https://unpkg.com/maplibre-gl@^4.0.0/dist/maplibre-gl.js"></script>
+<link href="https://unpkg.com/maplibre-gl@^4.0.0/dist/maplibre-gl.css" rel="stylesheet"/>
+
+<style>
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: sans-serif;
+}
+
+#map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+}
+
+/* TOP LEFT INFO PANEL */
+
+.info-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 2;
+
+    background: rgba(255,255,255,0.95);
+
+    width: 300px;
+
+    padding: 16px;
+
+    border-radius: 10px;
+
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+}
+
+.year-display {
+    font-size: 32px;
+    font-weight: bold;
+
+    margin-bottom: 12px;
+}
+
+#context {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.context-title {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+/* BOTTOM TIMELINE */
+
+.timeline-container {
+    position: absolute;
+
+    bottom: 30px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    
+    width: 60%;
+    min-width: 320px;
+    max-width: 900px;
+
+    z-index: 2;
+
+    background: rgba(255,255,255,0.92);
+
+    padding: 18px 24px;
+
+    border-radius: 12px;
+
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+}
+
+#yearSlider {
+    width: 100%;
+    cursor: pointer;
+}
+
+.timeline-labels {
+    display: flex;
+    justify-content: space-between;
+
+    margin-top: 8px;
+
+    font-size: 12px;
+    color: #666;
+}
+
+</style></head>
+
+<body>
+
+<!-- TOP LEFT INFO -->
+
+<div class="info-panel">
+
+    <div class="year-display" id="yearDisplay">
+        1783
+    </div>
+
+    <div id="context">
+
+        <span class="context-title" id="ctx-title">
+            1783
+        </span>
+
+        <span id="ctx-text">
+            Historical information coming soon.
+        </span>
+
+    </div>
+
+</div>
+
+<!-- BOTTOM TIMELINE -->
+
+<div class="timeline-container">
+
+    <input
+        type="range"
+        id="yearSlider"
+        min="0"
+        max="8"
+        step="1"
+        value="0"
+    />
+
+    <div class="timeline-labels">
+        <span>1783</span>
+        <span>1898</span>
+    </div>
+
+</div>
+
+<div id="map"></div>
+
+<script>
+
+const years = [
+'1783',
+'1803',
+'1819',
+'1845',
+'1846',
+'1848',
+'1853',
+'1867',
+'1898'
+];
+
+const info = {
+
+    '1783': {
+        title: 'Treaty of Paris (1783)',
+        text: 'The United States gained independence from Great Britain following the American Revolutionary War. The new nation stretched west to the Mississippi River.'
+    },
+
+    '1803': {
+        title: 'Louisiana Purchase (1803)',
+        text: 'The United States purchased a vast territory from France, doubling the size of the nation and opening the continent for westward expansion.'
+    },
+
+    '1819': {
+    title: 'Expansion into the Pacific Northwest (1819)',
+    text: 'Following diplomatic agreements with Britain and Spain, American territorial claims extended across the Pacific Northwest, including the Oregon Country and lands reaching toward the Pacific Ocean.'
+},
+
+    '1845': {
+    title: 'Texas Annexation and Florida Statehood (1845)',
+    text: 'The Republic of Texas was annexed by the United States, greatly expanding the nation to the southwest and increasing tensions with Mexico. Florida, acquired from Spain following the Adams–Onís Treaty in 1821, was admitted as the 27th state in 1845.'
+},
+
+    '1846': {
+        title: 'Oregon Treaty (1846)',
+        text: 'The United States and Great Britain agreed on the 49th parallel as the boundary in the Pacific Northwest, securing the Oregon Territory.'
+    },
+
+    '1848': {
+        title: 'Mexican Cession (1848)',
+        text: 'Following the Mexican–American War, Mexico ceded a massive territory including present-day California, Nevada, Utah, and much of the American Southwest.'
+    },
+
+    '1853': {
+        title: 'Gadsden Purchase (1853)',
+        text: 'The United States purchased land from Mexico in present-day southern Arizona and New Mexico, creating the modern continental US boundary.'
+    },
+
+    '1867': {
+        title: 'Alaska Purchase (1867)',
+        text: 'The United States purchased Alaska from the Russian Empire in a deal initially mocked as “Seward’s Folly” but later recognized as highly strategic.'
+    },
+
+    '1898': {
+        title: 'Annexation of Hawaii (1898)',
+        text: 'The United States annexed Hawaii during a period of overseas expansion following the Spanish–American War, marking the emergence of the US as a Pacific power.'
+    }
+
+};    
+
+function setYearFromHash() {
+
+    const hash = window.location.hash.replace('#', '');
+
+    if(years.includes(hash)) {
+
+        const index = years.indexOf(hash);
+
+        slider.value = index;
+
+        showYear(hash);
+
+    }
+
+}    
+
+const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://tiles.openfreemap.org/styles/positron',
+    center: [-96, 39],
+    zoom: 2.8
+});
+
+map.on('load', () => {
+
+    years.forEach((year, index) => {
+
+        map.addSource(`usa${year}`, {
+            type: 'geojson',
+            data: `https://mapsmania.github.io/openhistorymaps/usa/${year}.geojson`
+        });
+
+        map.addLayer({
+            id: `layer${year}`,
+            type: 'line',
+            source: `usa${year}`,
+
+            layout: {
+                visibility: index === 0 ? 'visible' : 'none',
+                'line-join': 'round',
+                'line-cap': 'round'
+            },
+
+            paint: {
+                'line-color': getColor(index),
+                'line-width': 3,
+                'line-opacity': 0.9,
+                'line-dasharray': [2, 1]
+            }
+        });
+
+    });
+
+    setYearFromHash();
+
+});
+
+const slider = document.getElementById('yearSlider');
+
+slider.addEventListener('input', (e) => {
+
+    const index = parseInt(e.target.value);
+
+    const selectedYear = years[index];
+
+    showYear(selectedYear);
+
+});
+
+function showYear(selectedYear) {
+
+    window.location.hash = selectedYear;
+
+    slider.value = years.indexOf(selectedYear);
+
+    years.forEach(year => {
+
+        map.setLayoutProperty(
+            `layer${year}`,
+            'visibility',
+            year === selectedYear
+                ? 'visible'
+                : 'none'
+        );
+
+    });
+
+    document.getElementById('yearDisplay').innerText =
+        selectedYear;
+
+    document.getElementById('ctx-title').innerText =
+    info[selectedYear].title;
+
+document.getElementById('ctx-text').innerText =
+    info[selectedYear].text;
+
+}
+    
+function getColor(index) {
+
+    const colors = [
+        '#e74c3c',
+        '#3498db',
+        '#27ae60',
+        '#9b59b6',
+        '#f39c12',
+        '#1abc9c',
+        '#d35400',
+        '#2c3e50',
+        '#7f8c8d',
+        '#c0392b',
+        '#16a085'
+    ];
+
+    return colors[index % colors.length];
+
+}
+
+window.addEventListener('hashchange', () => {
+    setYearFromHash();
+});    
+
+</script>
+
+</body>
+</html>
