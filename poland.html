@@ -1,14 +1,30 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poland Border Shift: Historical Context</title>
+    <title>Poland: Historical Borders</title>
+
     <script src="https://unpkg.com/maplibre-gl@^4.0.0/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@^4.0.0/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.2.0/turf.min.js"></script>
+
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
         .controls {
             position: absolute;
             top: 20px;
@@ -18,8 +34,9 @@
             border-radius: 8px;
             box-shadow: 0 0 15px rgba(0,0,0,0.2);
             z-index: 1;
-            width: 280px; /* Widened to fit text better */
+            width: 280px;
         }
+
         button {
             padding: 10px 15px;
             cursor: pointer;
@@ -28,17 +45,33 @@
             font-weight: bold;
             border-radius: 4px;
             margin-bottom: 5px;
-            width: 100%; /* Make buttons stack nicely */
+            width: 100%;
             text-align: left;
         }
+
         button.active {
             background: #2c3e50;
             color: white;
             border-color: #2c3e50;
         }
-        .legend { margin-bottom: 10px; font-size: 14px; }
-        
-        /* New Styles for Context Box */
+
+        button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .legend {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        #status {
+            margin-top: 10px;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #666;
+        }
+
         #context {
             margin-top: 15px;
             padding-top: 15px;
@@ -47,6 +80,7 @@
             line-height: 1.5;
             color: #444;
         }
+
         .context-title {
             font-weight: bold;
             display: block;
@@ -55,112 +89,778 @@
         }
     </style>
 </head>
+
 <body>
 
 <div class="controls">
+
     <div class="legend"><strong>Polish Borders</strong></div>
-    <button id="btn1815" class="active" onclick="showEra('1815')">1815 Borders</button>
-    <button id="btn1939" onclick="showEra('1939')">1939 Borders</button>
-    <button id="btn1945" onclick="showEra('1945')">1945 Borders</button>
-    
-    <!-- New Context Div -->
+
+    <button id="btn1815" disabled onclick="showEra('1815')">
+        1815 Borders
+    </button>
+
+    <button id="btn1939" disabled onclick="showEra('1939')">
+        1939 Borders
+    </button>
+
+    <button id="btn1945" disabled onclick="showEra('1945')">
+        1945 Borders
+    </button>
+
+    <button id="btnCommon" disabled onclick="showEra('common')">
+        Common Ground
+    </button>
+
+    <button id="btnLost" disabled onclick="showEra('lost')">
+        Lost Territory
+    </button>
+
+    <button id="btnGained" disabled onclick="showEra('gained')">
+        Gained Territory
+    </button>
+
+    <div id="status">Loading map...</div>
+
     <div id="context">
-        <span class="context-title" id="ctx-title">Congress Poland (1815)</span>
-        <span id="ctx-text">Created at the Congress of Vienna after the Napoleonic Wars. It was a semi-autonomous Kingdom in a personal union with the Russian Empire.</span>
+
+        <span class="context-title" id="ctx-title">
+            Congress Poland (1815)
+        </span>
+
+        <span id="ctx-text">
+            Created at the Congress of Vienna after the Napoleonic Wars.
+            It was a semi-autonomous Kingdom in a personal union with the
+            Russian Empire.
+        </span>
+
     </div>
+
 </div>
 
 <div id="map"></div>
 
 <script>
+
     const map = new maplibregl.Map({
         container: 'map',
-        style: 'https://tiles.openfreemap.org/styles/positron', 
-        center: [19.145, 52.068], 
+        style: 'https://tiles.openfreemap.org/styles/positron',
+        center: [19.145, 52.068],
         zoom: 5
     });
 
-    const eras = ['1815', '1939', '1945'];
 
-    // Historical Content Object
+    // AVAILABLE MAP OPTIONS
+
+    const eras = [
+        '1815',
+        '1939',
+        '1945',
+        'common',
+        'lost',
+        'gained'
+    ];
+
+
+    // TRACK WHICH MAP LAYERS ARE READY
+
+    const availableEras = new Set();
+
+    let selectedEra = '1815';
+
+
+    // HISTORICAL CONTENT
+
     const info = {
+
         '1815': {
             title: 'Congress Poland (1815)',
             text: 'Created at the Congress of Vienna after the Napoleonic Wars. It was a semi-autonomous Kingdom in a personal union with the Russian Empire.'
         },
+
         '1939': {
             title: 'Second Polish Republic (1939)',
             text: 'The borders of independent Poland before the Nazi-Soviet invasion. Note the "Polish Corridor" to the sea and the eastern territories (Kresy).'
         },
+
         '1945': {
             title: 'Post-War Poland (1945)',
-            text: 'Following WWII, Polands borders were shifted west. It lost eastern lands to the USSR but gained former German territories in the west and north.'
+            text: 'Following WWII, Poland’s borders were shifted west. It lost eastern lands to the USSR but gained former German territories in the west and north.'
+        },
+
+        'common': {
+            title: 'Poland: Common Ground',
+            text: 'The territory that was part of Poland in all three historical periods: 1815, 1939 and 1945.'
+        },
+
+        'lost': {
+            title: 'Poland: Lost Territory',
+            text: 'Territory that was part of Poland in either 1815 or 1939, but was outside the post-war Polish borders established in 1945.'
+        },
+
+        'gained': {
+            title: 'Poland: Gained Territory',
+            text: 'Territory that was part of Poland in 1945 but was outside both the 1815 and 1939 borders.'
         }
+
     };
 
-    map.on('load', () => {
-        // 1. ADD 1815
-        map.addSource('poland1815', {
+
+    // BUTTON HELPERS
+
+    function getButtonId(era) {
+
+        if (era === 'common') return 'btnCommon';
+        if (era === 'lost') return 'btnLost';
+        if (era === 'gained') return 'btnGained';
+
+        return `btn${era}`;
+
+    }
+
+
+    function enableButton(era) {
+
+        document.getElementById(
+            getButtonId(era)
+        ).disabled = false;
+
+    }
+
+
+    // ADD AN HISTORICAL BORDER LAYER
+
+    function addHistoricalLayer(era, geojson) {
+
+        const colours = {
+            '1815': '#27ae60',
+            '1939': '#e74c3c',
+            '1945': '#3498db'
+        };
+
+        map.addSource(`poland${era}`, {
             type: 'geojson',
-            data: 'https://mapsmania.github.io/openhistorymaps/poland1815.geojson' 
-        });
-        map.addLayer({
-            'id': 'layer1815',
-            'type': 'line',
-            'source': 'poland1815',
-            'layout': { 'visibility': 'visible' },
-            'paint': { 'line-color': '#27ae60', 'line-width': 3 }
+            data: geojson
         });
 
-        // 2. ADD 1939
-        map.addSource('poland1939', {
-            type: 'geojson',
-            data: 'https://mapsmania.github.io/openhistorymaps/poland1938.geojson'
-        });
         map.addLayer({
-            'id': 'layer1939',
-            'type': 'line',
-            'source': 'poland1939',
-            'layout': { 'visibility': 'none' },
-            'paint': { 'line-color': '#e74c3c', 'line-width': 3 }
-        });
 
-        // 3. ADD 1945
-        map.addSource('poland1945', {
-            type: 'geojson',
-            data: 'https://mapsmania.github.io/openhistorymaps/poland1945.geojson'
-        });
-        map.addLayer({
-            'id': 'layer1945',
-            'type': 'line',
-            'source': 'poland1945',
-            'layout': { 'visibility': 'none' },
-            'paint': {
-                'line-color': '#3498db',
-                'line-width': 3,
-                'line-dasharray': [2, 1]
+            id: `layer${era}`,
+            type: 'line',
+            source: `poland${era}`,
+
+            layout: {
+                visibility: 'none'
+            },
+
+            paint: {
+                'line-color': colours[era],
+                'line-width': 3
             }
+
         });
+
+        availableEras.add(era);
+        enableButton(era);
+
+    }
+
+
+    // LOAD A SINGLE GEOJSON FILE
+
+    async function loadEra(era, url) {
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load ${era} GeoJSON`);
+        }
+
+        const geojson = await response.json();
+
+        addHistoricalLayer(era, geojson);
+
+        return geojson;
+
+    }
+
+
+    // CONVERT GEOJSON INTO POLYGONS
+
+    function getPolygon(geojson) {
+
+        const polygons = geojson.type === 'FeatureCollection'
+            ? geojson.features
+            : [geojson];
+
+        if (
+            !polygons.length ||
+            polygons.some(f =>
+                !['Polygon', 'MultiPolygon'].includes(f.geometry?.type)
+            )
+        ) {
+            throw new Error(
+                'One of the GeoJSON files does not contain valid polygons.'
+            );
+        }
+
+        if (polygons.length === 1) {
+            return polygons[0];
+        }
+
+        return turf.union(
+            turf.featureCollection(polygons)
+        );
+
+    }
+
+
+    // ADD THE THREE CALCULATED OVERLAYS
+
+    function addOverlayLayers(commonArea, lostArea, gainedArea) {
+
+        // COMMON GROUND - GOLD
+
+        map.addSource('commonPoland', {
+            type: 'geojson',
+            data: commonArea || turf.featureCollection([])
+        });
+
+        map.addLayer({
+
+            id: 'commonPolandFill',
+            type: 'fill',
+            source: 'commonPoland',
+
+            layout: {
+                visibility: 'none'
+            },
+
+            paint: {
+                'fill-color': '#f1c40f',
+                'fill-opacity': 0.55
+            }
+
+        });
+
+        map.addLayer({
+
+            id: 'commonPolandOutline',
+            type: 'line',
+            source: 'commonPoland',
+
+            layout: {
+                visibility: 'none'
+            },
+
+            paint: {
+                'line-color': '#d4ac0d',
+                'line-width': 2
+            }
+
+        });
+
+
+        // LOST TERRITORY - ORANGE
+
+        map.addSource('lostPoland', {
+            type: 'geojson',
+            data: lostArea || turf.featureCollection([])
+        });
+
+        map.addLayer({
+
+            id: 'lostPolandFill',
+            type: 'fill',
+            source: 'lostPoland',
+
+            layout: {
+                visibility: 'none'
+            },
+
+            paint: {
+                'fill-color': '#e67e22',
+                'fill-opacity': 0.6
+            }
+
+        });
+
+        map.addLayer({
+
+            id: 'lostPolandOutline',
+            type: 'line',
+            source: 'lostPoland',
+
+            layout: {
+                visibility: 'none'
+            },
+
+            paint: {
+                'line-color': '#d35400',
+                'line-width': 2
+            }
+
+        });
+
+
+        // GAINED TERRITORY - GREEN
+
+        map.addSource('gainedPoland', {
+            type: 'geojson',
+            data: gainedArea || turf.featureCollection([])
+        });
+
+        map.addLayer({
+
+            id: 'gainedPolandFill',
+            type: 'fill',
+            source: 'gainedPoland',
+
+            layout: {
+                visibility: 'none'
+            },
+
+            paint: {
+                'fill-color': '#2ecc71',
+                'fill-opacity': 0.6
+            }
+
+        });
+
+        map.addLayer({
+
+            id: 'gainedPolandOutline',
+            type: 'line',
+            source: 'gainedPoland',
+
+            layout: {
+                visibility: 'none'
+            },
+
+            paint: {
+                'line-color': '#239b56',
+                'line-width': 2
+            }
+
+        });
+
+
+        // MAKE THE THREE OPTIONS AVAILABLE
+
+        ['common', 'lost', 'gained'].forEach(era => {
+
+            availableEras.add(era);
+            enableButton(era);
+
+        });
+
+    }
+
+
+    // CALCULATE AREA IN SQUARE KILOMETRES
+
+    function calculateArea(feature) {
+
+        if (!feature) return '0';
+
+        return Math.round(
+            turf.area(feature) / 1000000
+        ).toLocaleString('en-GB');
+
+    }
+
+
+    // CALCULATE THE THREE HISTORICAL OVERLAYS
+
+    async function calculateHistoricalTerritories(
+        geo1815,
+        geo1939,
+        geo1945
+    ) {
+
+        const status = document.getElementById('status');
+
+        status.innerText = 'Calculating historical territories...';
+
+        // Allow the browser to update the map and status message
+        // before starting the Turf calculations.
+
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+
+        try {
+
+            // GET THE THREE POLYGONS
+
+            const p1815 = getPolygon(geo1815);
+            const p1939 = getPolygon(geo1939);
+            const p1945 = getPolygon(geo1945);
+
+
+            // COMBINE THE 1815 AND 1939 TERRITORIES
+
+            const historicalUnion = turf.union(
+                turf.featureCollection([p1815, p1939])
+            );
+
+
+            // COMMON GROUND
+            // Territory shared by all three periods
+
+            const overlap1 = turf.intersect(
+                turf.featureCollection([p1815, p1939])
+            );
+
+            const commonArea = overlap1
+                ? turf.intersect(
+                    turf.featureCollection([overlap1, p1945])
+                )
+                : null;
+
+
+            // LOST TERRITORY
+            // 1815 OR 1939, BUT NOT 1945
+
+            const lostArea = historicalUnion
+                ? turf.difference(
+                    turf.featureCollection([historicalUnion, p1945])
+                )
+                : null;
+
+
+            // GAINED TERRITORY
+            // 1945, BUT NOT 1815 OR 1939
+
+            const gainedArea = historicalUnion
+                ? turf.difference(
+                    turf.featureCollection([p1945, historicalUnion])
+                )
+                : null;
+
+
+            // ADD THE OVERLAY LAYERS
+
+            addOverlayLayers(
+                commonArea,
+                lostArea,
+                gainedArea
+            );
+
+
+            // COMMON GROUND AREA
+
+            if (commonArea) {
+
+                const area = calculateArea(commonArea);
+
+                info.common.text +=
+                    ` Its total area is approximately ${area} km².`;
+
+                console.log('Common territory:', area, 'km²');
+
+            } else {
+
+                info.common.text =
+                    'No common territory was found across all three historical periods.';
+
+            }
+
+
+            // LOST TERRITORY AREA
+
+            if (lostArea) {
+
+                const area = calculateArea(lostArea);
+
+                info.lost.text +=
+                    ` Its total area is approximately ${area} km².`;
+
+                console.log('Lost territory:', area, 'km²');
+
+            } else {
+
+                info.lost.text =
+                    'No lost territory was found.';
+
+            }
+
+
+            // GAINED TERRITORY AREA
+
+            if (gainedArea) {
+
+                const area = calculateArea(gainedArea);
+
+                info.gained.text +=
+                    ` Its total area is approximately ${area} km².`;
+
+                console.log('Gained territory:', area, 'km²');
+
+            } else {
+
+                info.gained.text =
+                    'No gained territory was found.';
+
+            }
+
+
+            status.innerText =
+                'All historical borders and territory calculations are ready.';
+
+            // Refresh the displayed text if one of the calculated
+            // options was selected while the calculations were running.
+
+            if (
+                selectedEra === 'common' ||
+                selectedEra === 'lost' ||
+                selectedEra === 'gained'
+            ) {
+                document.getElementById('ctx-text').innerText =
+                    info[selectedEra].text;
+            }
+
+
+        } catch (error) {
+
+            console.error(
+                'Error calculating historical territories:',
+                error
+            );
+
+            info.common.text =
+                'Unable to calculate common territory. Check the GeoJSON files and browser console.';
+
+            info.lost.text =
+                'Unable to calculate lost territory. Check the GeoJSON files and browser console.';
+
+            info.gained.text =
+                'Unable to calculate gained territory. Check the GeoJSON files and browser console.';
+
+            status.innerText =
+                'The historical borders loaded, but the territory calculations failed.';
+
+        }
+
+    }
+
+
+    // ========================================
+    // LOAD MAP AND GEOJSON
+    // ========================================
+
+    map.on('load', async () => {
+
+        const status = document.getElementById('status');
+
+        const urls = {
+
+            '1815': 'https://mapsmania.github.io/openhistorymaps/poland1815.geojson',
+
+            '1939': 'https://mapsmania.github.io/openhistorymaps/poland1938.geojson',
+
+            '1945': 'https://mapsmania.github.io/openhistorymaps/poland1945.geojson'
+
+        };
+
+
+        // FIRST: LOAD AND DISPLAY 1815
+
+        try {
+
+            status.innerText = 'Loading 1815 borders...';
+
+            const geo1815 = await loadEra('1815', urls['1815']);
+
+            // Display the first border immediately.
+
+            showEra('1815');
+
+            status.innerText =
+                '1815 borders displayed. Loading other historical periods...';
+
+
+            // SECOND: LOAD 1939 AND 1945 IN PARALLEL
+
+            // Each border is added to the map as soon as its own
+            // GeoJSON file has finished loading.
+
+            const results = await Promise.allSettled([
+
+                loadEra('1939', urls['1939']),
+
+                loadEra('1945', urls['1945'])
+
+            ]);
+
+
+            const result1939 = results[0];
+            const result1945 = results[1];
+
+
+            // CHECK THAT BOTH FILES LOADED SUCCESSFULLY
+
+            if (
+                result1939.status !== 'fulfilled' ||
+                result1945.status !== 'fulfilled'
+            ) {
+
+                console.error('Error loading historical GeoJSON:', results);
+
+                status.innerText =
+                    'Some historical borders could not be loaded. Check the browser console.';
+
+                info.common.text =
+                    'Unable to calculate common territory because one or more GeoJSON files failed to load.';
+
+                info.lost.text =
+                    'Unable to calculate lost territory because one or more GeoJSON files failed to load.';
+
+                info.gained.text =
+                    'Unable to calculate gained territory because one or more GeoJSON files failed to load.';
+
+                return;
+
+            }
+
+
+            // THIRD: CALCULATE THE OVERLAYS
+
+            await calculateHistoricalTerritories(
+
+                geo1815,
+
+                result1939.value,
+
+                result1945.value
+
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                'Error loading 1815 GeoJSON:',
+                error
+            );
+
+            status.innerText =
+                'Unable to load the 1815 borders. Check the GeoJSON file and browser console.';
+
+        }
+
     });
 
-    function showEra(selectedEra) {
+
+
+    // ========================================
+    // SWITCH BETWEEN MAP OPTIONS
+    // ========================================
+
+    function showEra(selected) {
+
+        // Don't attempt to display a layer that has not loaded yet.
+
+        if (!availableEras.has(selected)) {
+            return;
+        }
+
+        selectedEra = selected;
+
+
         eras.forEach(era => {
-            const visibility = (era === selectedEra) ? 'visible' : 'none';
-            map.setLayoutProperty(`layer${era}`, 'visibility', visibility);
-            
-            const btn = document.getElementById(`btn${era}`);
-            if (era === selectedEra) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
+
+            const isSelected = era === selected;
+
+
+            // Only change visibility for layers that exist.
+
+            if (!availableEras.has(era)) {
+                return;
             }
+
+
+            if (era === 'common') {
+
+                map.setLayoutProperty(
+                    'commonPolandFill',
+                    'visibility',
+                    isSelected ? 'visible' : 'none'
+                );
+
+                map.setLayoutProperty(
+                    'commonPolandOutline',
+                    'visibility',
+                    isSelected ? 'visible' : 'none'
+                );
+
+            }
+
+            else if (era === 'lost') {
+
+                map.setLayoutProperty(
+                    'lostPolandFill',
+                    'visibility',
+                    isSelected ? 'visible' : 'none'
+                );
+
+                map.setLayoutProperty(
+                    'lostPolandOutline',
+                    'visibility',
+                    isSelected ? 'visible' : 'none'
+                );
+
+            }
+
+            else if (era === 'gained') {
+
+                map.setLayoutProperty(
+                    'gainedPolandFill',
+                    'visibility',
+                    isSelected ? 'visible' : 'none'
+                );
+
+                map.setLayoutProperty(
+                    'gainedPolandOutline',
+                    'visibility',
+                    isSelected ? 'visible' : 'none'
+                );
+
+            }
+
+            else {
+
+                map.setLayoutProperty(
+                    `layer${era}`,
+                    'visibility',
+                    isSelected ? 'visible' : 'none'
+                );
+
+            }
+
+
+            // UPDATE ACTIVE BUTTON
+
+            const btn = document.getElementById(
+                getButtonId(era)
+            );
+
+            btn.classList.toggle('active', isSelected);
+
         });
 
-        // Update the Context Text
-        document.getElementById('ctx-title').innerText = info[selectedEra].title;
-        document.getElementById('ctx-text').innerText = info[selectedEra].text;
+
+        // UPDATE CONTEXT INFORMATION
+
+        document.getElementById('ctx-title').innerText =
+            info[selected].title;
+
+        document.getElementById('ctx-text').innerText =
+            info[selected].text;
+
     }
+
 </script>
 
 </body>
 </html>
+```
